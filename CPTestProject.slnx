@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="CPTestProject/CPTestProject.Client/CPTestProject.Client.csproj" />
+  <Project Path="CPTestProject/CPTestProject/CPTestProject.csproj" />
+</Solution>
