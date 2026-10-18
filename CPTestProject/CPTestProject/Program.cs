@@ -1,6 +1,8 @@
 using CPTestProject.Client.Pages;
 using CPTestProject.Components;
 using CPTestProject.Data;
+using CPTestProject.Services.ImportExport;
+using CPTestProject.Services.Endpoints;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +15,13 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
+
+// Add database services
+builder.Services.AddScoped<GpsImportService>();
+builder.Services.AddScoped<BtsImportService>();
+builder.Services.AddScoped<ImportService>();
+
+builder.Services.AddHttpClient(); // Important for Interactive Auto due to @inject HttpClient in ImportDialog.
 
 var app = builder.Build();
 
@@ -37,5 +46,7 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(CPTestProject.Client._Imports).Assembly);
+
+app.MapImportEndpoints(); //Add the import endpoints to the application
 
 app.Run();

@@ -15,6 +15,12 @@ namespace CPTestProject.Services.ImportExport
 
             XNamespace ns = document.Root?.Name.Namespace ?? throw new InvalidDataException("Chybný GPX dokument.");
 
+            if (document.Root?.Name.LocalName != "gpx")
+            {
+                throw new InvalidDataException(
+                    "Soubor není platný dokument GPX pro GPS Logger.");
+            }
+
             foreach (var point in document.Descendants(ns + "trkpt"))
             {
                 var latText = point.Attribute("lat")?.Value;
@@ -24,6 +30,11 @@ namespace CPTestProject.Services.ImportExport
                 if (!double.TryParse(latText, NumberStyles.Float, CultureInfo.InvariantCulture, out double latitude) ||
                     !double.TryParse(lonText, NumberStyles.Float, CultureInfo.InvariantCulture, out double longitude) ||
                     !DateTimeOffset.TryParse(timeText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var timestamp))
+                {
+                    continue;
+                }
+
+                if (!double.IsFinite(latitude) || !double.IsFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180)
                 {
                     continue;
                 }

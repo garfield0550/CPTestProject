@@ -14,7 +14,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Component\" />
     <Folder Include="Services\ImportExport\" />
     <Folder Include="wwwroot\JavaScript\" />
   </ItemGroup>
