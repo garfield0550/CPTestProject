@@ -1,0 +1,100 @@
+﻿@using CPTestProject.Client.Model
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div id="networkMap"
+     style="height: 500px; width: 100%;">
+</div>
+
+@code {
+    [Parameter]
+    public List<GpsPoint> GpsPoints { get; set; } = new();
+
+    [Parameter]
+    public List<BtsPoint> BtsPoints { get; set; } = new();
+
+    [Parameter]
+    public bool ShowGps { get; set; } = true;
+
+    [Parameter]
+    public bool ShowBts { get; set; } = true;
+
+    [Parameter]
+    public Guid? SelectedBtsId { get; set; }
+
+    [Parameter]
+    public EventCallback<Guid> OnBtsSelected { get; set; }
+
+    private IJSObjectReference? mapModule;
+    private DotNetObjectReference<MapView>? dotNetReference;
+
+    private List<GpsPoint>? renderedGpsPoints;
+    private List<BtsPoint>? renderedBtsPoints;
+    private Guid? renderedBtsId;
+
+	// AfterRenderAsync, not OnInitialized to ensure the container is present for the map to initialize.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNetReference = DotNetObjectReference.Create(this);
+            mapModule = await JS.InvokeAsync<IJSObjectReference>("import", "./JavaScript/map.js");
+            await mapModule.InvokeVoidAsync("initializeMap", "networkMap");
+        }
+
+        if (mapModule is null)
+            return;
+
+        // Redraw only when the dataset changes.
+        if (!ReferenceEquals(renderedGpsPoints, GpsPoints))
+        {
+            await mapModule.InvokeVoidAsync("showGpsRoute", GpsPoints);
+            renderedGpsPoints = GpsPoints;
+        }
+
+        if (!ReferenceEquals(renderedBtsPoints, BtsPoints))
+        {
+            await mapModule.InvokeVoidAsync("showBtsPoints", BtsPoints, dotNetReference);
+            renderedBtsPoints = BtsPoints;
+            renderedBtsId = null;
+        }
+
+        // Visibility changes do not redraw the datasets.
+        await mapModule.InvokeVoidAsync("setGpsVisible", ShowGps);
+        await mapModule.InvokeVoidAsync("setBtsVisible", ShowBts);
+
+        if (renderedBtsId != SelectedBtsId)
+        {
+            await mapModule.InvokeVoidAsync("selectBtsMarker", SelectedBtsId?.ToString());
+            renderedBtsId = SelectedBtsId;
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnBtsMarkerSelected(string id)
+    {
+        if (Guid.TryParse(id, out var parsedId))
+            await OnBtsSelected.InvokeAsync(parsedId);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (mapModule is not null)
+            {
+                await mapModule.InvokeVoidAsync("disposeMap");
+                await mapModule.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+            // Blazor Server disconnected.
+        }
+        finally
+        {
+            dotNetReference?.Dispose();
+        }
+    }
+}

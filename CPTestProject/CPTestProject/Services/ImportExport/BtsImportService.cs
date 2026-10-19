@@ -72,7 +72,6 @@ namespace CPTestProject.Services.ImportExport
                     {
                         throw new InvalidDataException("Chybí typ mobilní sítě.");
                     }
-
                     btsRecords.Add(record);
                 }
                 catch (Exception ex) when (ex is CsvHelperException || ex is FormatException || ex is InvalidDataException || ex is OverflowException)
@@ -80,7 +79,6 @@ namespace CPTestProject.Services.ImportExport
                     throw new InvalidDataException($"Chyba při zpracování CSV na řádku {csv.Context.Parser.Row}: {ex.Message}", ex);
                 }
             }
-
             return btsRecords;
         }
     }

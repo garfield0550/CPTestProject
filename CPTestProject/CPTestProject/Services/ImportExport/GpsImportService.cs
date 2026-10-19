@@ -7,8 +7,7 @@ namespace CPTestProject.Services.ImportExport
     public class GpsImportService
     {
 
-        public async Task<List<GpsRecord>> ParseAsync(
-            Stream stream, Guid batchId)
+        public async Task<List<GpsRecord>> ParseAsync(Stream stream, Guid batchId)
         {
             var gpsRecords = new List<GpsRecord>();
             var document = await XDocument.LoadAsync(stream, LoadOptions.None, CancellationToken.None);
@@ -17,8 +16,7 @@ namespace CPTestProject.Services.ImportExport
 
             if (document.Root?.Name.LocalName != "gpx")
             {
-                throw new InvalidDataException(
-                    "Soubor není platný dokument GPX pro GPS Logger.");
+                throw new InvalidDataException("Soubor není platný dokument GPX pro GPS Logger.");
             }
 
             foreach (var point in document.Descendants(ns + "trkpt"))
@@ -42,14 +40,12 @@ namespace CPTestProject.Services.ImportExport
                 double? ParseOptionalDouble(string name)
                 {
                     var value = point.Element(ns + name)?.Value;
-
                     return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var result) ? result : null;
                 }
 
                 int? ParseOptionalInt(string name)
                 {
                     var value = point.Element(ns + name)?.Value;
-
                     return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var result) ? result : null;
                 }
 
@@ -65,7 +61,6 @@ namespace CPTestProject.Services.ImportExport
                     TimestampUtc = timestamp.UtcDateTime
                 });
             }
-
             return gpsRecords;
         }
     }

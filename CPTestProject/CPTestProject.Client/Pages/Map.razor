@@ -1,5 +1,9 @@
 ﻿@page "/map"
+@inject HttpClient Http
+@inject NavigationManager Navigation
 @using CPTestProject.Client.Component
+@using CPTestProject.Client.Model
+@using System.Net.Http.Json
 
 <PageTitle>Mapa GPS/BTS</PageTitle>
 
@@ -21,34 +25,132 @@
                     </ul>
                 }
             </div>
-
-            <button class="btn btn-outline-secondary">Nastavení</button>
+            <button class="btn btn-outline-secondary" @onclick="() => showSettingsDialog = true">Nastavení</button>
         </div>
     </div>
 
-    <div class="row mb-3">
+    
+    <div class="row mb-3 g-3">
+
+        <!-- GPS controls -->
         <div class="col-md-6">
-            <label>
+            <label class="form-label">
                 <input type="checkbox" @bind="showGps" />GPS trasa</label>
+
+            <select class="form-select" value="@selectedGpsBatch" disabled="@(!importBatches.Any(x => x.FileType == 1))" @onchange="OnGpsBatchChanged">
+
+                @foreach (var batch in importBatches.Where(x => x.FileType == 1))
+                {
+                    <option value="@batch.BatchId">@batch.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") — @batch.SourceFileName</option>
+                }
+            </select>
         </div>
 
+        <!-- BTS controls -->
         <div class="col-md-6">
-            <label>
-                <input type="checkbox" @bind="showBts" />BTS měření</label>
+            <label class="form-label">
+                <input type="checkbox" @bind="showBts" />BTS měření
+            </label>
+
+            <select class="form-select" value="@selectedBtsBatch" disabled="@(!importBatches.Any(x => x.FileType == 2))" @onchange="OnBtsBatchChanged">
+
+                @foreach (var batch in importBatches.Where(x => x.FileType == 2))
+                {
+                    <option value="@batch.BatchId">@batch.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") — @batch.SourceFileName</option>
+                }
+            </select>
         </div>
+
     </div>
 
-    <!-- Map placeholder -->
-    <div class="border rounded bg-light d-flex align-items-center justify-content-center" style="height: 500px;">
-        <span class="text-muted">OSM placeholder.</span>
+    <!-- Map -->
+    <div class="border rounded overflow-hidden">
+        <MapView GpsPoints="@gpsPoints" ShowGps="@showGps" BtsPoints="@btsPoints" ShowBts="@showBts" SelectedBtsId="@selectedBts?.Id" OnBtsSelected="SelectBts"/>
     </div>
 
     <!-- Details panel -->
     <div class="card mt-3">
-        <div class="card-header">Detail BTS měření</div>
+        <div class="card-header">
+            Detail BTS měření
+        </div>
 
         <div class="card-body">
-            <p class="text-muted mb-0">Vyberte bod BTS měření na mapě.</p>
+            @if (selectedBts is null)
+            {
+                <p class="text-muted mb-0">
+                    Vyberte bod BTS měření na mapě.
+                </p>
+            }
+            else
+            {
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <strong>Typ sítě</strong>
+                        <div>@selectedBts.NetworkType</div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <strong>Cell ID</strong>
+                        <div>@selectedBts.CellId</div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <strong>MCC / MNC</strong>
+                        <div>
+                            @selectedBts.Mcc / @selectedBts.Mnc
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <strong>LAC / TAC</strong>
+                        <div>@(selectedBts.Lac?.ToString() ?? "—")</div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <strong>RSRP</strong>
+                        <div>@(selectedBts.Rsrp?.ToString() ?? "—") dBm</div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <strong>RSRQ</strong>
+                        <div>@(selectedBts.Rsrq?.ToString() ?? "—") dB</div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <strong>Signál (dBm)</strong>
+                        <div>@(selectedBts.SignalDbm?.ToString() ?? "—")</div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <strong>Čas měření</strong>
+                        <div>
+                            @(selectedBts.TimestampUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss"))
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <strong>Sousední buňka</strong>
+                        <div>
+                            @(selectedBts.IsNeighboring ? "Ano" : "Ne")
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <strong>GPS souřadnice měření</strong>
+                        <div>
+                            @selectedBts.Latitude.ToString("F6"),
+                            @selectedBts.Longitude.ToString("F6")
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <strong>Přesnost GPS</strong>
+                        <div>
+                            @(selectedBts.Accuracy?.ToString("F1") ?? "—") m
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
     </div>
 
@@ -59,12 +161,44 @@
     <ImportDialog OnClose="CloseImport" OnImported="ImportCompleted" />
 }
 
+@if (showSettingsDialog)
+{
+    <SettingsDialog OnClose="() => showSettingsDialog = false" OnDataCleared="DataClearedAsync" />
+}
 @code {
+    private bool showSettingsDialog;
+
+    private Task DataClearedAsync()
+    {
+        importBatches = new();
+
+        selectedGpsBatch = null;
+        selectedBtsBatch = null;
+
+        gpsPoints = new();
+        btsPoints = new();
+        selectedBts = null;
+
+        showSettingsDialog = false;
+
+        return Task.CompletedTask;
+    }
+
+
     private bool showSystemMenu;
     private bool showImportDialog;
 
     private bool showGps = true;
     private bool showBts = true;
+
+    private List<ImportBatch> importBatches = new();
+    private Guid? selectedBtsBatch;
+
+    private List<GpsPoint> gpsPoints = new();
+    private Guid? selectedGpsBatch;
+
+    private List<BtsPoint> btsPoints = new();
+    private BtsPoint? selectedBts;
 
     private void ToggleSystemMenu() => showSystemMenu = !showSystemMenu;
 
@@ -76,11 +210,77 @@
 
     private void CloseImport() => showImportDialog = false;
 
-    private Task ImportCompleted()
+    private async Task LoadImportsAsync()
+    {
+        var url = new Uri(
+            new Uri(Navigation.BaseUri),
+            "api/map/imports");
+
+        importBatches =
+            await Http.GetFromJsonAsync<List<ImportBatch>>(url)
+            ?? new();
+
+        // Select the newest import of each type.
+        selectedGpsBatch = importBatches
+            .FirstOrDefault(x => x.FileType == 1)?.BatchId;
+
+        selectedBtsBatch = importBatches
+            .FirstOrDefault(x => x.FileType == 2)?.BatchId;
+    }
+
+    private async Task ImportCompleted()
     {
         showImportDialog = false;
 
-        // TODO: refresh imported session dropdowns.
-        return Task.CompletedTask;
+        await LoadImportsAsync();
+        await LoadGpsAsync();
+        await LoadBtsAsync();
+    }
+    
+    private async Task LoadGpsAsync()
+    {
+        gpsPoints = new();
+
+        if (selectedGpsBatch is null)
+            return;
+
+        var url = new Uri(new Uri(Navigation.BaseUri), $"api/map/gps/{selectedGpsBatch}");
+        gpsPoints = await Http.GetFromJsonAsync<List<GpsPoint>>(url) ?? new();
+    }
+
+    private async Task OnGpsBatchChanged(ChangeEventArgs e)
+    {
+        selectedGpsBatch = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        await LoadGpsAsync();
+    }
+
+    private async Task LoadBtsAsync()
+    {
+        btsPoints = new();
+        selectedBts = null;
+
+        if (selectedBtsBatch is null)
+            return;
+
+        var url = new Uri(new Uri(Navigation.BaseUri), $"api/map/bts/{selectedBtsBatch}");
+        btsPoints = await Http.GetFromJsonAsync<List<BtsPoint>>(url) ?? new();
+    }
+
+    private async Task OnBtsBatchChanged(ChangeEventArgs e)
+    {
+        selectedBtsBatch = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        await LoadBtsAsync();
+    }
+
+    private void SelectBts(Guid id)
+    {
+        selectedBts = btsPoints.FirstOrDefault(x => x.Id == id);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadImportsAsync();
+        await LoadGpsAsync();
+        await LoadBtsAsync();
     }
 }

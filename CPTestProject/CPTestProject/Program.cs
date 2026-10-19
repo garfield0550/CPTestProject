@@ -10,6 +10,8 @@ var builder = WebApplication.CreateBuilder(args);
 // Add Entity Framework services
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+// for MS SQL use ... change line above to UseSqlServer, update the connection string and run "dotnet add package Microsoft.EntityFrameworkCore.SqlServer" to add the SQL Server provider package. Migrations can be skipped if database is prepared manually.
+
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -48,5 +50,20 @@ app.MapRazorComponents<App>()
     .AddAdditionalAssemblies(typeof(CPTestProject.Client._Imports).Assembly);
 
 app.MapImportEndpoints(); //Add the import endpoints to the application
+app.MapDataEndpoints(); //Add the data endpoints to the application
+
+// Add clear all imported data endpoint. This is a dangerous operation. For preview purposes, it is left unprotected. In production, consider adding authentication and authorization checks.
+app.MapPost("/api/map/clear", async (AppDbContext db) =>
+{
+    await using var transaction = await db.Database.BeginTransactionAsync();
+
+    await db.GpsRecords.ExecuteDeleteAsync();
+    await db.BtsRecords.ExecuteDeleteAsync();
+    await db.ImportBatches.ExecuteDeleteAsync();
+
+    await transaction.CommitAsync();
+
+    return Results.NoContent();
+});
 
 app.Run();

@@ -11,8 +11,6 @@ namespace CPTestProject.Services.ImportExport
         private readonly GpsImportService GpsParser;
         private readonly BtsImportService BtsParser;
         
-
-
         public ImportService(AppDbContext db, GpsImportService gpsParser, BtsImportService btsParser)
         {
             Db = db;

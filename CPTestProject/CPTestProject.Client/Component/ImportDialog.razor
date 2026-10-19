@@ -24,6 +24,7 @@
 
                 <label class="form-label">Soubor</label>
                 <InputFile class="form-control" OnChange="FileSelected" disabled="@isUploading" />
+				<!-- Consider adding file type filter -->
 
                 @if (!string.IsNullOrEmpty(errorMessage))
                 {

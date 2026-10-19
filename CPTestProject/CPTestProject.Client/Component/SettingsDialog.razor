@@ -1,0 +1,125 @@
+﻿@using System.Net.Http
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<div class="modal fade show d-block"
+     tabindex="-1"
+     role="dialog"
+     aria-modal="true">
+
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 class="modal-title">Nastavení</h5>
+
+                <button type="button"
+                        class="btn-close"
+                        disabled="@isDeleting"
+                        @onclick="Close">
+                </button>
+            </div>
+
+            <div class="modal-body">
+
+                <h6>Správa dat</h6>
+
+                @if (!confirmDelete)
+                {
+                    <p class="text-muted">
+                        Odstranění všech importovaných GPS a BTS záznamů.
+                        Struktura databáze zůstane zachována.
+                    </p>
+
+                    <button class="btn btn-outline-danger"
+                            @onclick="() => confirmDelete = true">
+                        Smazat všechna data
+                    </button>
+                }
+                else
+                {
+                    <div class="alert alert-warning">
+                        Opravdu chcete nenávratně smazat
+                        všechna importovaná data?
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-danger"
+                                disabled="@isDeleting"
+                                @onclick="ClearDataAsync">
+                            @(isDeleting ? "Mazání..." : "Ano, smazat")
+                        </button>
+
+                        <button class="btn btn-secondary"
+                                disabled="@isDeleting"
+                                @onclick="() => confirmDelete = false">
+                            Zrušit
+                        </button>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger mt-3 mb-0">
+                        @errorMessage
+                    </div>
+                }
+
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary"
+                        disabled="@isDeleting"
+                        @onclick="Close">
+                    Zavřít
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div class="modal-backdrop fade show"></div>
+
+@code {
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback OnDataCleared { get; set; }
+
+    private bool confirmDelete;
+    private bool isDeleting;
+    private string? errorMessage;
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task ClearDataAsync()
+    {
+        if (!confirmDelete || isDeleting)
+            return;
+
+        isDeleting = true;
+        errorMessage = null;
+
+        try
+        {
+            var url = new Uri(new Uri(Navigation.BaseUri), "api/map/clear");
+            using var response = await Http.PostAsync(url, null);
+            response.EnsureSuccessStatusCode();
+
+            await OnDataCleared.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Mazání se nezdařilo: {ex.Message}";
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+}
